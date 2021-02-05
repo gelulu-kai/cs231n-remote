@@ -32,6 +32,7 @@ def sample_noise(batch_size, dim, seed=None):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     pass
+    return 2 * torch.rand((batch_size, dim)) - 1
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     
@@ -51,8 +52,20 @@ def discriminator(seed=None):
     # HINT: nn.Sequential might be helpful.                                      #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
-
+        # Why use Flatten()? 
+        # Because in loader_train, tensor shape is (batch_size,1,28,28) [see train part]
+        # inplace为True，将会改变输入的数据 ，否则不会改变原输入，只会产生新的输出，节省显存
+        # nn.LeakyReLU(alpha, inplace=True)
+        # torch.nn.Linear(in_features, out_features, bias=True)
     pass
+    model = nn.Sequential(
+        Flatten(),
+        nn.Linear(784, 256),
+        nn.LeakyReLU(0.01),
+        nn.Linear(256, 256),
+        nn.LeakyReLU(0.01),
+        nn.Linear(256, 1)
+    )
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -78,6 +91,14 @@ def generator(noise_dim=NOISE_DIM, seed=None):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     pass
+    model = nn.Sequential(
+        nn.Linear(noise_dim, 1024),
+        nn.ReLU(),
+        nn.Linear(1024, 1024),
+        nn.ReLU(),
+        nn.Linear(1024, 784),
+        nn.Tanh()
+    )
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -119,6 +140,11 @@ def discriminator_loss(logits_real, logits_fake):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     pass
+    real_labels = torch.ones_like(logits_real).type(dtype)
+    fake_labels = 1 - real_labels
+    loss_from_data = bce_loss(logits_real, real_labels)
+    loss_from_sample = bce_loss(logits_fake, fake_labels)
+    loss = loss_from_data + loss_from_sample
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     return loss
@@ -137,6 +163,8 @@ def generator_loss(logits_fake):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     pass
+    fake_labels = torch.ones_like(logits_fake).type(dtype)
+    loss = bce_loss(logits_fake, fake_labels)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     return loss
@@ -156,6 +184,7 @@ def get_optimizer(model):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     pass
+    optimizer = optim.Adam(model.parameters(), lr=0.001, betas=(0.5, 0.999))
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     return optimizer
@@ -175,6 +204,8 @@ def ls_discriminator_loss(scores_real, scores_fake):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     pass
+    loss = 0.5 * (scores_real - torch.ones_like(scores_real).type(dtype))**2 + 0.5*(scores_fake)**2
+    loss = loss.mean()
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     return loss
@@ -193,6 +224,8 @@ def ls_generator_loss(scores_fake):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     pass
+    loss = 0.5 * (scores_fake - torch.ones_like(scores_fake).type(dtype))**2
+    loss = loss.mean()
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     return loss
@@ -211,6 +244,20 @@ def build_dc_classifier(batch_size):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     pass
+    model = nn.Sequential(
+        Unflatten(batch_size, 1, 28, 28),
+        nn.Conv2d(1, 32, kernel_size=5, stride=1),# (batch_size, 32, 24, 24)
+        nn.LeakyReLU(0.01),
+        nn.MaxPool2d(kernel_size=2, stride=2),# (batch_size, 32, 12, 12)
+        nn.Conv2d(32, 64, kernel_size=5, stride=1),# (batch_size, 64, 8, 8)
+        nn.LeakyReLU(0.01),
+        nn.MaxPool2d(kernel_size=2, stride=2),# (batch_size, 64, 4, 4)
+        Flatten(),
+        nn.Linear(64*4*4, 64*4*4),
+        nn.LeakyReLU(0.01),
+        nn.Linear(64*4*4, 1)
+    )
+    return model
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -218,7 +265,7 @@ def build_dc_classifier(batch_size):
     ##############################################################################
 
 
-def build_dc_generator(noise_dim=NOISE_DIM):
+def build_dc_generator(batch_size, noise_dim=NOISE_DIM):
     """
     Build and return a PyTorch model implementing the DCGAN generator using
     the architecture described above.
@@ -232,6 +279,23 @@ def build_dc_generator(noise_dim=NOISE_DIM):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     pass
+    model = nn.Sequential(
+        nn.Linear(noise_dim, 1024),
+        nn.ReLU(),
+        nn.BatchNorm1d(1024),
+        
+        nn.Linear(1024, 7*7*128),
+        nn.ReLU(),
+        nn.BatchNorm1d(7*7*128),
+        Unflatten(batch_size, 128, 7, 7),
+        nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),# (batch_size, 64, 14, 14)
+        nn.ReLU(),
+        nn.BatchNorm2d(64),
+        nn.ConvTranspose2d(64, 1, kernel_size=4, stride=2, padding=1),# (batch_size, 1, 28, 28)
+        nn.Tanh(),
+        Flatten(),# (batch_size, 784)
+    )
+    return model
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################

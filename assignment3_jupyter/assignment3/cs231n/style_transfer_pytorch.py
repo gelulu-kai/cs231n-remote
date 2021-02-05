@@ -27,6 +27,9 @@ def content_loss(content_weight, content_current, content_original):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     pass
+    diff = (content_current - content_original)**2
+    return content_weight * torch.sum(diff)
+
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -47,6 +50,19 @@ def gram_matrix(features, normalize=True):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     pass
+    shape = features.size()
+    features = features.view([shape[0], shape[1], -1])
+    transpose_features = features.clone()
+    # print(transpose_features.size())
+    transpose_features = transpose_features.permute(0,2,1)
+    # print(transpose_features.size())
+    # print(features.size())
+    result = torch.matmul(features, transpose_features)
+    # print(result.size())
+    if normalize:
+      result = result / (shape[0]*shape[1]*shape[2]*shape[3])
+    return result
+
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -74,6 +90,12 @@ def style_loss(feats, style_layers, style_targets, style_weights):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     pass
+    style_losses = 0
+    for i in range(len(style_layers)):
+      indx = style_layers[i]
+      style_losses += content_loss(style_weights[i], gram_matrix(feats[indx]), style_targets[i])
+    
+    return style_losses
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
@@ -93,6 +115,14 @@ def tv_loss(img, tv_weight):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     pass
+    row_cur = img[:, :, :-1, :]
+    row_lat = img[:, :, 1:, :]
+    col_cur = img[:,:,:,:-1]
+    col_lat = img[:,:,:,1:]
+    result_row = row_lat - row_cur
+    result_col = col_lat - col_cur
+    loss = tv_weight * (torch.sum(result_row**2) + torch.sum(result_col**2))
+    return loss
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 def preprocess(img, size=512):

@@ -152,6 +152,23 @@ class CaptioningRNN(object):
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
         pass
+        h0, features_cache = affine_forward(features, W_proj, b_proj)
+        captions_in_emb, emb_in_cache = word_embedding_forward(captions_in, W_embed)
+        if self.cell_type == 'rnn':
+          h , rnn_cache = rnn_forward(captions_in_emb, h0, Wx, Wh, b)
+        elif self.cell_type == 'lstm':
+          h, lstm_cache = lstm_forward(captions_in_emb, h0, Wx, Wh, b)
+        temporal_out, temporal_cache = temporal_affine_forward(h, W_vocab, b_vocab)
+
+        loss, dout = temporal_softmax_loss(temporal_out, captions_out, mask)
+
+        dtemp_out, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dout, temporal_cache)
+        if self.cell_type == 'rnn':
+          dcaptions_in_emb, dh0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dtemp_out, rnn_cache)
+        elif self.cell_type == 'lstm':
+          dcaptions_in_emb, dh0, grads['Wx'], grads['Wh'], grads['b'] = lstm_backward(dtemp_out, lstm_cache)
+        grads['W_embed'] = word_embedding_backward(dcaptions_in_emb, emb_in_cache)
+        dfeatures, grads['W_proj'], grads['b_proj'] = affine_backward(dh0, features_cache)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
@@ -220,6 +237,27 @@ class CaptioningRNN(object):
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
         pass
+        T = max_length
+        captions_in = self._start * np.ones((N, T), dtype=np.int32)
+        captions[:, 0] = self._start
+        h0, _ = affine_forward(features, W_proj, b_proj)
+        prev_h = h0
+        if self.cell_type == 'lstm':
+          prev_c = np.zeros_like(prev_h)
+
+        for t in range(1, T):
+          x_emb, _ = word_embedding_forward(captions_in[:, t], W_embed)
+          if self.cell_type == 'rnn':
+            next_h, _ = rnn_step_forward(x_emb, prev_h, Wx, Wh, b)
+            prev_h = next_h
+          elif self.cell_type == 'lstm':
+            next_h, next_c, _ = lstm_step_forward(x_emb, prev_h, prev_c, Wx, Wh, b)
+            prev_c = next_c
+            prev_h = next_h
+          x_vacb, _ = affine_forward(prev_h, W_vocab, b_vocab)
+          x = np.argmax(x_vacb, axis=1)
+          captions[:, t] = x
+
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
